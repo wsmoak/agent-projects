@@ -78,21 +78,21 @@ Internet
                     ├── EC2 permissions (DevPod creates EC2 instances for sandboxes)
                     └── Secrets Manager read
 
-VPC private subnets:
-  ├── RDS PostgreSQL – LangGraph state persistence
-  └── ElastiCache Redis – LangGraph run queue
+Single AZ, single private subnet (no multi-AZ, no redundancy — test/blog deployment):
+  ├── RDS PostgreSQL – LangGraph state persistence (single-AZ)
+  └── ElastiCache Redis – LangGraph run queue (single node)
 ```
 
-### New Terraform files in `/Users/wsmoak/Projects/aws-infrastructure/`
+### New Terraform files in `/Users/wsmoak/Projects/aws-infrastructure/open-swe/`
 
-Add new .tf files alongside the existing flat structure:
+A separate subdirectory with its own `terraform.tfstate`, so `terraform destroy` only affects OpenSWE resources and never touches the existing S3/IAM state in the parent directory.
 
 | File | Resources |
 |------|-----------|
-| `vpc.tf` | VPC, public/private subnets, IGW, NAT gateway, route tables |
+| `vpc.tf` | VPC, one public + one private subnet (single AZ), IGW, one NAT gateway, route tables |
 | `ecr.tf` | ECR repository for the OpenSWE/LangGraph Docker image |
-| `rds.tf` | RDS PostgreSQL instance (LangGraph state), subnet group, security group |
-| `elasticache.tf` | ElastiCache Redis cluster (LangGraph queue), subnet group, security group |
+| `rds.tf` | RDS PostgreSQL instance (LangGraph state), single-AZ, subnet group, security group |
+| `elasticache.tf` | ElastiCache Redis single-node cluster (LangGraph queue), subnet group, security group |
 | `secrets.tf` | Secrets Manager secret for all OpenSWE env vars |
 | `ecs.tf` | ECS cluster, task definition, Fargate service |
 | `alb.tf` | ALB, target group, HTTPS listener, ACM certificate |
@@ -110,6 +110,18 @@ Add new .tf files alongside the existing flat structure:
 - `SANDBOX_TYPE=devpod`
 - `DEVPOD_PROVIDER=aws`
 
+### Domain and TLS
+
+- Domain: `open-swe.wendysmoak.com`
+- DNS managed in Cloudflare (domain registered elsewhere)
+- Set the Cloudflare CNAME to **DNS only (grey cloud)** — not proxied — to avoid TLS conflicts with the ALB
+
+**Steps:**
+1. Request ACM cert for `open-swe.wendysmoak.com` (via Terraform `aws_acm_certificate`)
+2. Add the ACM validation CNAME record in Cloudflare
+3. After `terraform apply`, add a CNAME in Cloudflare: `open-swe.wendysmoak.com` → ALB DNS name
+4. After `terraform destroy`, remove both CNAME records
+
 ### Slack Integration
 
 OpenSWE handles Slack via the `/webhooks/slack` endpoint on the FastAPI app. Slack sends HTTP POST events to this URL when the bot is mentioned.
@@ -117,7 +129,7 @@ OpenSWE handles Slack via the `/webhooks/slack` endpoint on the FastAPI app. Sla
 **What's needed:**
 1. A Slack App (created at api.slack.com) with:
    - Bot Token Scopes: `app_mentions:read`, `chat:write`, `channels:history`, `groups:history`
-   - Event subscriptions enabled, Request URL: `https://<alb-dns>/webhooks/slack`
+   - Event subscriptions enabled, Request URL: `https://open-swe.wendysmoak.com/webhooks/slack`
    - Slash commands or mentions configured as desired
 2. Env vars in Secrets Manager:
    - `SLACK_BOT_TOKEN` – bot OAuth token (`xoxb-...`)
@@ -125,7 +137,7 @@ OpenSWE handles Slack via the `/webhooks/slack` endpoint on the FastAPI app. Sla
    - `SLACK_BOT_USER_ID` – the bot's user ID (found in Slack App settings)
    - `SLACK_BOT_USERNAME` – display name
    - `SLACK_REPO_OWNER` / `SLACK_REPO_NAME` – GitHub repo the bot operates on
-3. After `terraform apply`, update the Slack App's Request URL to the ALB DNS name
+3. After `terraform apply`, update the Slack App's Request URL to `https://open-swe.wendysmoak.com/webhooks/slack`
 
 **Note:** The ALB listener must accept HTTPS (port 443) — Slack requires HTTPS for event subscriptions. The ACM certificate must be valid before Slack will verify the endpoint.
 
@@ -155,7 +167,7 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
   - [ ] `secrets.tf`, `iam_ecs.tf`, `cloudwatch.tf`
   - [ ] `ecs.tf`, `alb.tf`
   - [ ] `variables.tf`, `outputs.tf`
-  - [ ] `terraform init && terraform plan && terraform apply`
+  - [ ] `cd /Users/wsmoak/Projects/aws-infrastructure/open-swe && terraform init && terraform plan && terraform apply`
 - [ ] `langgraph build` → push to ECR
 - [ ] Update webhook URLs (GitHub App, Linear, Slack) to ALB DNS name
 - [ ] Write and publish blog post (see Phase C below)
@@ -186,9 +198,9 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
 - `/Users/wsmoak/Projects/open-swe-with-devpod/Dockerfile` (add devpod CLI)
 
 **aws-infrastructure repo:**
-- `/Users/wsmoak/Projects/aws-infrastructure/` – new .tf files listed above
+- `/Users/wsmoak/Projects/aws-infrastructure/open-swe/` – new .tf files listed above
 
 ## Verification
 
 - **Phase A**: Set `SANDBOX_TYPE=devpod DEVPOD_PROVIDER=docker`, trigger a GitHub comment, confirm a Docker-based DevPod workspace is created and the agent executes code inside it
-- **Phase B**: Hit `https://<alb-dns>/health`; trigger a GitHub webhook; confirm end-to-end run with DevPod workspaces created as EC2 instances in us-east-2
+- **Phase B**: Hit `https://open-swe.wendysmoak.com/health`; trigger a GitHub webhook; confirm end-to-end run with DevPod workspaces created as EC2 instances in us-east-2
