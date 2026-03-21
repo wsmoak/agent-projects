@@ -26,10 +26,10 @@ Implement `SandboxBackendProtocol` using the DevPod CLI. DevPod must be installe
 
 Required protocol methods (based on the existing protocol):
 - `id: str` – workspace name (unique per thread/run)
-- `execute(command, timeout)` – `devpod ssh <workspace> -- bash -c "<command>"`
-- `write(file_path, content)` – pipe content over stdin via SSH into the workspace
-- `download_files(paths)` – `devpod ssh <workspace> -- cat <path>` for each file
-- `upload_files(files)` – write bytes over SSH for each file
+- `execute(command, timeout)` – `devpod ssh <workspace> --command "<wrapped-command>"`; redirect command stderr to stdout inside the shell so DevPod's own status messages stay separate
+- `upload_files(files)` – pipe bytes over stdin: `devpod ssh <workspace> --command "tee <path>"` for each file; **must be implemented — it is abstract in `BaseSandbox`**
+- `download_files(paths)` – `devpod ssh <workspace> --command "cat <path>"` for each file; **must be implemented — it is abstract in `BaseSandbox`**
+- `write`, `read`, `edit`, `grep_raw`, `glob_info`, `ls_info` – all inherited from `BaseSandbox` and implemented via `execute()`; no override needed
 
 Workspace lifecycle:
 - **Create**: `devpod up <workspace-name> --provider aws --ide none --source image:<image>`
@@ -51,15 +51,39 @@ Environment variables:
 
 - Workspace name = derived from LangGraph `thread_id` so the same sandbox is reused across tool calls in one run
 - Use `subprocess.run()` for all DevPod CLI calls; capture stdout/stderr and map to `ExecuteResponse`
-- For file writes, pipe via stdin: `subprocess.run(["devpod", "ssh", name, "--", f"tee {path}"], input=content.encode())`
-- Pattern the implementation after `daytona.py` (similar lifecycle: create/reconnect/execute)
+- `execute()` uses `--command` flag (not `--`), wraps the command as `{ <cmd>; } 2>&1` to merge stderr into stdout so DevPod's own status messages on subprocess stderr stay separate
+- `upload_files`: `subprocess.run(["devpod", "ssh", name, "--command", f"tee {path}"], input=content)` for each file; collect `FileUploadResponse` per file, catch per-file exceptions
+- `download_files`: `subprocess.run(["devpod", "ssh", name, "--command", f"cat {path}"])` for each file; collect `FileDownloadResponse` per file, catch per-file exceptions
+- **`upload_files` and `download_files` are abstract in `BaseSandbox`** — omitting them causes `TypeError` on instantiation; they were not implemented in the initial version and must be added
+- Pattern the implementation after `daytona.py` for lifecycle (create/reconnect/execute); `langsmith.py` for `upload_files`/`download_files` shape
 
-### Testing Phase A locally
+### Testing Phase A
 
-1. Install DevPod CLI locally, configure `docker` provider
-2. Set `SANDBOX_TYPE=devpod`, `DEVPOD_PROVIDER=docker`
-3. Run `make dev` + `make run`, trigger a test via GitHub issue comment
-4. Confirm workspace is created in Docker and commands execute inside it
+**Unit tests** (no DevPod required):
+
+- Write `tests/test_devpod.py` using `unittest.mock.patch("subprocess.run")`
+- Cover: `execute()` builds the right CLI args and maps stdout/exit_code; workspace creation failure raises `RuntimeError`; reconnect path skips `devpod up`; `upload_files` pipes bytes correctly; `download_files` returns file content
+
+**Integration tests** (docker provider, requires DevPod CLI + Docker Desktop):
+
+1. `devpod provider add docker` (one-time setup)
+2. `SANDBOX_TYPE=devpod DEVPOD_PROVIDER=docker python -c "from agent.integrations.devpod import create_devpod_sandbox; sb = create_devpod_sandbox(); ..."`
+3. Exercise each method against the live workspace:
+   - `execute("echo hello")` → verify output
+   - `write("/tmp/test.txt", "hello")` then `read("/tmp/test.txt")` → verify round-trip
+   - `edit("/tmp/test.txt", "hello", "world")` → verify replacement
+   - `upload_files([("/tmp/upload.txt", b"uploaded")])` → verify no error
+   - `download_files(["/tmp/upload.txt"])` → verify content matches
+   - `delete()` → verify workspace is removed from `devpod list`
+4. Trigger a full agent run via GitHub issue comment to confirm end-to-end flow with a real LangGraph thread_id
+
+**What cannot be tested locally:**
+
+- IAM role credentials for the AWS provider — only testable in ECS
+
+**What requires `make dev` (local LangGraph server) but is otherwise fully testable locally:**
+
+- `_update_thread_sandbox_metadata` — `langgraph dev` starts a local LangGraph server at `http://localhost:2024`; `langgraph_sdk.get_client()` connects there by default; run `make dev` in one terminal and trigger a run from another to confirm thread metadata is written
 
 ---
 
@@ -176,10 +200,16 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
 ## Order of work
 
 - [x] Phase A: DevPod sandbox provider (open-swe repo)
-  - [x] `agent/integrations/devpod.py`
+  - [x] `agent/integrations/devpod.py` — `execute()`, workspace create/reconnect/delete, `_generate_workspace_name`, `_update_thread_sandbox_metadata`
   - [x] Update `agent/utils/sandbox.py`
   - [x] Add DevPod CLI to `Dockerfile`
-- [x] Test Phase A locally (docker provider) — smoke test passes, all commands clean
+  - [ ] Implement `upload_files` in `DevPodBackend` (abstract method — currently missing, causes `TypeError` on instantiation)
+  - [ ] Implement `download_files` in `DevPodBackend` (same issue)
+  - [ ] Write `tests/test_devpod.py` unit tests (mock subprocess)
+- [ ] Test Phase A fully
+  - [x] Docker workspace creation confirmed via Docker Desktop
+  - [ ] Integration test: write/read/edit/upload/download/delete against docker provider
+  - [ ] End-to-end agent run via GitHub issue comment (`make dev` + `make run`, trigger via GitHub issue, confirm thread metadata has `sandbox_id` set)
 - [ ] Phase B: Terraform (aws-infrastructure repo)
   - [ ] `vpc.tf`, `ecr.tf`
   - [ ] `rds.tf`, `elasticache.tf`
