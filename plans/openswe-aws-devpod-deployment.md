@@ -106,20 +106,39 @@ A separate subdirectory with its own `terraform.tfstate`, so `terraform destroy`
 `langgraph build -t <ecr-repo-url>:latest` produces the production Docker image. It runs on port 8123 and needs:
 - `POSTGRES_URI` – from RDS
 - `REDIS_URI` – from ElastiCache
-- All OpenSWE env vars (from Secrets Manager)
 - `SANDBOX_TYPE=devpod`
 - `DEVPOD_PROVIDER=aws`
+- Secrets from Secrets Manager (see below)
+
+### Secrets Manager contents
+
+All of these go into the `open-swe/env` secret. The ECS task definition injects them at container startup.
+
+| Variable | Source | Required |
+|----------|--------|----------|
+| `ANTHROPIC_API_KEY` | Anthropic console — the agent uses `anthropic:claude-opus-4-6` as its LLM | Yes |
+| `GITHUB_TOKEN` | GitHub PAT or App token — for cloning repos and opening PRs | Yes |
+| `SLACK_BOT_TOKEN` | Slack App → OAuth & Permissions (`xoxb-...`) | If using Slack |
+| `SLACK_SIGNING_SECRET` | Slack App → Basic Information | If using Slack |
+| `SLACK_BOT_USER_ID` | Slack App settings — the bot's user ID | If using Slack |
+| `SLACK_BOT_USERNAME` | Display name for the bot | If using Slack |
+| `SLACK_REPO_OWNER` | GitHub org/user — default repo for Slack-triggered tasks | If using Slack |
+| `SLACK_REPO_NAME` | GitHub repo name — default repo for Slack-triggered tasks | If using Slack |
+| `LINEAR_API_KEY` | Linear API settings | If using Linear |
+| `LANGSMITH_API_KEY_PROD` | LangSmith console — for tracing/observability | Optional |
+
+**Note:** GitHub-triggered tasks get the repo from the webhook payload, so they work across any repo the GitHub App is installed on. Slack-triggered tasks default to `SLACK_REPO_OWNER/SLACK_REPO_NAME`.
 
 ### Domain and TLS
 
-- Domain: `open-swe.wendysmoak.com`
+- Domain: `openswe.wendysmoak.com`
 - DNS managed in Cloudflare (domain registered elsewhere)
 - Set the Cloudflare CNAME to **DNS only (grey cloud)** — not proxied — to avoid TLS conflicts with the ALB
 
 **Steps:**
-1. Request ACM cert for `open-swe.wendysmoak.com` (via Terraform `aws_acm_certificate`)
+1. Request ACM cert for `openswe.wendysmoak.com` (via Terraform `aws_acm_certificate`)
 2. Add the ACM validation CNAME record in Cloudflare
-3. After `terraform apply`, add a CNAME in Cloudflare: `open-swe.wendysmoak.com` → ALB DNS name
+3. After `terraform apply`, add a CNAME in Cloudflare: `openswe.wendysmoak.com` → ALB DNS name
 4. After `terraform destroy`, remove both CNAME records
 
 ### Slack Integration
@@ -129,7 +148,7 @@ OpenSWE handles Slack via the `/webhooks/slack` endpoint on the FastAPI app. Sla
 **What's needed:**
 1. A Slack App (created at api.slack.com) with:
    - Bot Token Scopes: `app_mentions:read`, `chat:write`, `channels:history`, `groups:history`
-   - Event subscriptions enabled, Request URL: `https://open-swe.wendysmoak.com/webhooks/slack`
+   - Event subscriptions enabled, Request URL: `https://openswe.wendysmoak.com/webhooks/slack`
    - Slash commands or mentions configured as desired
 2. Env vars in Secrets Manager:
    - `SLACK_BOT_TOKEN` – bot OAuth token (`xoxb-...`)
@@ -137,7 +156,7 @@ OpenSWE handles Slack via the `/webhooks/slack` endpoint on the FastAPI app. Sla
    - `SLACK_BOT_USER_ID` – the bot's user ID (found in Slack App settings)
    - `SLACK_BOT_USERNAME` – display name
    - `SLACK_REPO_OWNER` / `SLACK_REPO_NAME` – GitHub repo the bot operates on
-3. After `terraform apply`, update the Slack App's Request URL to `https://open-swe.wendysmoak.com/webhooks/slack`
+3. After `terraform apply`, update the Slack App's Request URL to `https://openswe.wendysmoak.com/webhooks/slack`
 
 **Note:** The ALB listener must accept HTTPS (port 443) — Slack requires HTTPS for event subscriptions. The ACM certificate must be valid before Slack will verify the endpoint.
 
@@ -156,11 +175,11 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
 
 ## Order of work
 
-- [ ] Phase A: DevPod sandbox provider (open-swe repo)
-  - [ ] `agent/integrations/devpod.py`
-  - [ ] Update `agent/utils/sandbox.py`
-  - [ ] Add DevPod CLI to `Dockerfile`
-- [ ] Test Phase A locally (docker provider)
+- [x] Phase A: DevPod sandbox provider (open-swe repo)
+  - [x] `agent/integrations/devpod.py`
+  - [x] Update `agent/utils/sandbox.py`
+  - [x] Add DevPod CLI to `Dockerfile`
+- [x] Test Phase A locally (docker provider) — smoke test passes, all commands clean
 - [ ] Phase B: Terraform (aws-infrastructure repo)
   - [ ] `vpc.tf`, `ecr.tf`
   - [ ] `rds.tf`, `elasticache.tf`
@@ -171,6 +190,20 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
 - [ ] `langgraph build` → push to ECR
 - [ ] Update webhook URLs (GitHub App, Linear, Slack) to ALB DNS name
 - [ ] Write and publish blog post (see Phase C below)
+
+## Future Improvements
+
+### Slack Socket Mode (no webhooks)
+
+Currently the Slack integration uses incoming webhooks, which requires a public URL (ALB in production, ngrok in local dev). A better alternative is **Slack Socket Mode**, where the agent opens an outbound WebSocket connection to Slack's event server — no public URL needed.
+
+- Local dev: works without ngrok
+- Production: no ALB listener rule needed for Slack events; only the LangGraph server port needs to be exposed
+- Implementation: replace the `/webhooks/slack` FastAPI route with a `slack_bolt` `SocketModeHandler` running as a background thread/task
+
+Reference: `~/Projects/openclaw` uses a socket-based Slack integration worth reviewing for patterns.
+
+---
 
 ## Phase C: Blog Post
 
@@ -203,4 +236,4 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
 ## Verification
 
 - **Phase A**: Set `SANDBOX_TYPE=devpod DEVPOD_PROVIDER=docker`, trigger a GitHub comment, confirm a Docker-based DevPod workspace is created and the agent executes code inside it
-- **Phase B**: Hit `https://open-swe.wendysmoak.com/health`; trigger a GitHub webhook; confirm end-to-end run with DevPod workspaces created as EC2 instances in us-east-2
+- **Phase B**: Hit `https://openswe.wendysmoak.com/health`; trigger a GitHub webhook; confirm end-to-end run with DevPod workspaces created as EC2 instances in us-east-2
