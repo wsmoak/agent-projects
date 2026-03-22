@@ -219,12 +219,24 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
   - [x] `cd /Users/wsmoak/Projects/aws-infrastructure/open-swe && terraform init && terraform plan && terraform apply`
 - [x] `langgraph build` → push to ECR
 - [x] Update webhook URLs (GitHub App, Linear, Slack) to ALB DNS name
-- [ ] Fix DevPod provider AMI lookup failure
-  - [ ] Upgrade DevPod CLI from v0.6.5 to v0.6.15 (in `langgraph.json` dockerfile_lines and/or Dockerfile)
-  - [ ] Also check devpod-provider-aws version (currently v0.0.17, downloaded at runtime)
-  - [ ] If AMI lookup still broken, fix the provider or pre-seed `~/.devpod/` config
-  - [ ] ECS is now X86_64 (changed from ARM64 on 2026-03-22)
-  - [ ] Rebuild (`DOCKER_DEFAULT_PLATFORM=linux/amd64 langgraph build`), push, deploy, test webhook
+- [x] Fix DevPod provider AMI lookup failure (completed 2026-03-22)
+  - [x] Upgrade DevPod CLI from v0.6.5 to v0.6.15 (in `langgraph.json` dockerfile_lines and/or Dockerfile)
+  - [x] Confirmed devpod-provider-aws v0.0.17 is latest — bug is upstream (https://github.com/loft-sh/devpod-provider-aws/issues/50)
+  - [x] ECS is now X86_64 (changed from ARM64 on 2026-03-22)
+  - [x] Workaround: copied Canonical's Ubuntu 22.04 AMI into our account with description matching provider's filter
+    - Source: `ami-096a2911074929e0b` (Canonical, owner 099720109477)
+    - Copy: `ami-044f1545c3936f4c7` (our account, description "Canonical, Ubuntu, 22.04 LTS")
+    - Cost: ~$0.40/month (EBS snapshot storage for 8GB volume)
+    - This AMI will need periodic refresh as Canonical publishes new Ubuntu 22.04 images
+  - [x] Added DEVPOD_AWS_SUBNET_ID and DEVPOD_AWS_VPC_ID to ECS task definition (DevPod needs these to find a subnet for EC2)
+  - [x] Rebuilt, pushed, deployed, tested webhook — EC2 workspace created, repo cloned, agent ran successfully
+  - [ ] For production: switch to skevetter's fork of devpod-provider-aws or maintain our own fork
+- [x] Fix app-level bugs found during first end-to-end run (verified 2026-03-22)
+  - [x] Agent commented on issue/PR #1 instead of issue #85 — fixed: always prefer config issue number over LLM arg
+  - [x] Agent can't push — fixed: replaced `sandbox_backend.write()` with `printf` via `execute()` for credential file (heredoc template doesn't work through DevPod SSH), added prompt instruction to never run `git push` directly
+  - [x] Stale workspace recovery — agent now catches RuntimeError from dead workspaces and recreates sandbox
+  - [x] DevPod credential proxy incompatible with Fargate — fixed: `_disable_git_credential_injection()` runs `devpod context set-options default -o SSH_INJECT_GIT_CREDENTIALS=false` before workspace creation
+  - [x] End-to-end test passed: agent edited README.md, pushed, opened PR #86, and commented back on issue #85
 - [ ] Write and publish blog post (see Phase C below)
 
 ## Phase D: DevPod with `--source git:` and Devcontainer Support

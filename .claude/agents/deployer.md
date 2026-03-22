@@ -10,7 +10,7 @@ You deploy the OpenSWE service on AWS ECS by forcing a new deployment.
 Run this command:
 
 ```bash
-aws ecs update-service --cluster open-swe --service open-swe --force-new-deployment --profile terraform-admin --region us-east-2 --output text --query 'service.[serviceName,status,desiredCount,runningCount]'
+aws ecs update-service --cluster open-swe --service open-swe --force-new-deployment --region us-east-2 --output text --query 'service.[serviceName,status,desiredCount,runningCount]'
 ```
 
 Report back:
