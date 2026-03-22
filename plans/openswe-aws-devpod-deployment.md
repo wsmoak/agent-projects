@@ -203,23 +203,103 @@ ec2:CreateTags, ec2:DescribeSubnets, ec2:DescribeVpcs
   - [x] `agent/integrations/devpod.py` — `execute()`, workspace create/reconnect/delete, `_generate_workspace_name`, `_update_thread_sandbox_metadata`
   - [x] Update `agent/utils/sandbox.py`
   - [x] Add DevPod CLI to `Dockerfile`
-  - [ ] Implement `upload_files` in `DevPodBackend` (abstract method — currently missing, causes `TypeError` on instantiation)
-  - [ ] Implement `download_files` in `DevPodBackend` (same issue)
-  - [ ] Write `tests/test_devpod.py` unit tests (mock subprocess)
-- [ ] Test Phase A fully
+  - [x] Implement `upload_files` in `DevPodBackend` (abstract method — was missing, caused `TypeError` on instantiation)
+  - [x] Implement `download_files` in `DevPodBackend` (same issue)
+  - [x] Write `tests/test_devpod.py` unit tests (mock subprocess) — 20 tests, all passing
+- [~] Test Phase A (partial — blocked by auth issue with docker provider)
   - [x] Docker workspace creation confirmed via Docker Desktop
-  - [ ] Integration test: write/read/edit/upload/download/delete against docker provider
-  - [ ] End-to-end agent run via GitHub issue comment (`make dev` + `make run`, trigger via GitHub issue, confirm thread metadata has `sandbox_id` set)
-- [ ] Phase B: Terraform (aws-infrastructure repo)
-  - [ ] `vpc.tf`, `ecr.tf`
-  - [ ] `rds.tf`, `elasticache.tf`
-  - [ ] `secrets.tf`, `iam_ecs.tf`, `cloudwatch.tf`
-  - [ ] `ecs.tf`, `alb.tf`
-  - [ ] `variables.tf`, `outputs.tf`
-  - [ ] `cd /Users/wsmoak/Projects/aws-infrastructure/open-swe && terraform init && terraform plan && terraform apply`
-- [ ] `langgraph build` → push to ECR
-- [ ] Update webhook URLs (GitHub App, Linear, Slack) to ALB DNS name
+  - [N/A] Integration test: write/read/edit/upload/download/delete against docker provider (blocked by auth issue)
+  - [N/A] End-to-end agent run via GitHub issue comment (deferred — will test after AWS deployment)
+- [x] Phase B: Terraform (aws-infrastructure repo)
+  - [x] `vpc.tf`, `ecr.tf`
+  - [x] `rds.tf`, `elasticache.tf`
+  - [x] `secrets.tf`, `iam_ecs.tf`, `cloudwatch.tf`
+  - [x] `ecs.tf`, `alb.tf`
+  - [x] `variables.tf`, `outputs.tf`
+  - [x] `cd /Users/wsmoak/Projects/aws-infrastructure/open-swe && terraform init && terraform plan && terraform apply`
+- [x] `langgraph build` → push to ECR
+- [x] Update webhook URLs (GitHub App, Linear, Slack) to ALB DNS name
+- [ ] Fix DevPod provider AMI lookup failure
+  - [ ] Upgrade DevPod CLI from v0.6.5 to v0.6.15 (in `langgraph.json` dockerfile_lines and/or Dockerfile)
+  - [ ] Also check devpod-provider-aws version (currently v0.0.17, downloaded at runtime)
+  - [ ] If AMI lookup still broken, fix the provider or pre-seed `~/.devpod/` config
+  - [ ] ECS is now X86_64 (changed from ARM64 on 2026-03-22)
+  - [ ] Rebuild (`DOCKER_DEFAULT_PLATFORM=linux/amd64 langgraph build`), push, deploy, test webhook
 - [ ] Write and publish blog post (see Phase C below)
+
+## Phase D: DevPod with `--source git:` and Devcontainer Support
+
+### Motivation
+
+The current Phase A implementation uses `--source image:<image>`, which creates a generic sandbox from a pre-built Docker image. The agent clones the target repo into this sandbox at runtime. This works for simple tasks (text edits, PRs) but does not provide project-specific dependencies (language runtimes, databases, test frameworks), so the agent cannot build or run tests.
+
+DevPod is designed to work with the **Dev Container spec** — the same `devcontainer.json` used by VS Code and GitHub Codespaces. When given `--source git:<repo-url>`, DevPod clones the repo, reads `.devcontainer/devcontainer.json`, and builds a fully configured environment with all dependencies.
+
+### What changes in devpod.py
+
+The `devpod up` command changes based on a new env var:
+
+| Mode | Env var | `devpod up` command |
+|------|---------|-------------------|
+| Image (current) | `DEVPOD_SOURCE_IMAGE=bracelangchain/deepagents-sandbox:v1` | `devpod up <name> --provider aws --ide none --source image:<image>` |
+| Git (new) | `DEVPOD_SOURCE_REPO=https://github.com/owner/repo` | `devpod up <name> --provider aws --ide none --source git:<repo-url>` |
+
+- If `DEVPOD_SOURCE_REPO` is set, use `--source git:<repo-url>` instead of `--source image:<image>`
+- The repo URL can also come from the agent's runtime context (the GitHub webhook payload includes the repo), so the provider could extract it dynamically rather than requiring a static env var
+- When using `--source git:`, DevPod handles cloning — the agent should not re-clone the repo into the workspace
+
+### What the target repo needs
+
+A `.devcontainer/devcontainer.json` in the repo. Examples:
+
+**Simple project (e.g. rails-otel-demo — Ruby + sqlite3):**
+```json
+{
+  "name": "rails-otel-demo",
+  "image": "mcr.microsoft.com/devcontainers/ruby:3.3",
+  "postCreateCommand": "bundle install && bin/rails db:prepare",
+  "customizations": {
+    "vscode": {
+      "extensions": ["shopify.ruby-lsp"]
+    }
+  }
+}
+```
+
+**Project with external services (e.g. Postgres + Redis):**
+```json
+{
+  "name": "my-app",
+  "dockerComposeFile": "docker-compose.devcontainer.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "postCreateCommand": "bundle install && bin/rails db:prepare"
+}
+```
+With a `docker-compose.devcontainer.yml` defining `app`, `db` (Postgres), `redis`, etc.
+
+DevPod supports Docker Compose in devcontainer configs, so multi-service environments work the same way they do in VS Code / Codespaces.
+
+### DevPod provider considerations for `--source git:`
+
+- **Docker provider** (local dev/testing): Docker Compose works natively — DevPod creates containers on Docker Desktop
+- **AWS provider** (production): DevPod spins up an EC2 instance and runs Docker inside it. Compose-based devcontainers work because Docker is installed on the instance. The instance needs enough resources for all services (app + db + redis, etc.)
+- The AWS provider's instance type may need to be configurable per-project if some projects require more resources than others
+
+### Order of work
+
+- [ ] Add `DEVPOD_SOURCE_REPO` support to `devpod.py` — change `devpod up` source arg based on env var
+- [ ] Skip the agent's repo-clone step when using `--source git:` (the code is already in the workspace)
+- [ ] Add `.devcontainer/devcontainer.json` to rails-otel-demo as a test case
+- [ ] Test locally with Docker provider: `DEVPOD_SOURCE_REPO=https://github.com/wsmoak/rails-otel-demo DEVPOD_PROVIDER=docker`
+- [ ] Test that the agent can run `bundle exec rspec` inside the workspace
+- [ ] Test with AWS provider after the AMI lookup issue (Phase A blocker) is resolved
+
+### Fallback behavior
+
+If `--source git:` is used but the repo has no `devcontainer.json`, DevPod falls back to a default base image (`mcr.microsoft.com/devcontainers/base`). This gives you a generic Linux environment with git and common tools — roughly equivalent to the current `--source image:` approach but without the project-specific sandbox image. The agent could still clone and edit files, but building/testing would likely fail without the right language runtime.
+
+---
 
 ## Future Improvements
 
