@@ -7,6 +7,8 @@ model: haiku
 
 You monitor the OpenSWE ECS deployment until it stabilizes.
 
+DO NOT try to read AWS secrets.
+
 Poll the service status every 30 seconds, up to 10 attempts (5 minutes total):
 
 ```bash
