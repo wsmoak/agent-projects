@@ -1,4 +1,4 @@
-# OpenSWE + DevPod 
+# OpenSWE + DevPod
 
 ## Orientation
 
@@ -7,10 +7,13 @@ Read /Users/wsmoak/Projects/aws-infrastructure/open-swe/RUNBOOK.md
 
 Work in the following repositories
 1. this one (planning / orchestrating)
-2. /Users/wsmoak/Projects/aws-infrastructure/open-swe
-3. /Users/wsmoak/Projects/open-swe-with-devpod (fork of OpenSWE)
+2. /Users/wsmoak/Projects/aws-infrastructure/open-swe (Terraform)
+3. /Users/wsmoak/Projects/open-swe-aws-devpod-aegra (fork of OpenSWE)
+4. /Users/wsmoak/Projects/wsmoak.github.io (blog)
 
 If you need to look at the source code of DevPod, we have a fork at /Users/wsmoak/Projects/devpod .
+
+If you need to look at the source code of Aegra, we have a fork at /Users/wsmoak/Projects/aegra .
 
 ## Notes
 
@@ -28,7 +31,7 @@ If you get this error "An error occurred (InvalidSignatureException) when callin
 
 ## Subagents
 
-You have subagents for infrastructure work:  `builder`, `watcher`, `deployer`, etc.  Use them.  Do not run the commands in Bash yourself.  Those commands produce A LOT of output that fills up your context.  
+You have subagents for infrastructure work:  `builder`, `watcher`, `deployer`, etc.  Use them.  Do not run the commands in Bash yourself.  Those commands produce A LOT of output that fills up your context.
 
 ## Testing
 
