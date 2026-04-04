@@ -16,6 +16,8 @@ If you need to look at the source code of Aegra, we have a fork at /Users/wsmoak
 
 The source code of devpod-provider-aws is in /Users/wsmoak/Projects/devpod-provider-aws
 
+The project we use for testing is /Users/wsmoak/Projects/rails-otel-demo
+
 ## Notes
 
 use `git -C` in order to execute git commands in a different directory.
