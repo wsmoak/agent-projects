@@ -20,13 +20,13 @@ This happens even when AWS credentials are provided via `-o AWS_ACCESS_KEY_ID=..
 ### Environment
 
 - DevPod v0.18.2 (skevetter fork)
-- devpod-provider-aws v0.4.0
+- devpod-provider-aws v0.4.0 (skevetter fork)
 - Running on AWS Fargate (ECS) with task IAM role credentials
 - No `~/.aws/config` or `~/.aws/credentials` files present
 
 ### Root Cause
 
-The `init` command in `cmd/init.go` calls `aws.NewAWSConfig()`, which calls `awsConfig.LoadDefaultConfig()` in `pkg/aws/aws.go`. 
+The `init` command in `cmd/init.go` calls `aws.NewAWSConfig()`, which calls `awsConfig.LoadDefaultConfig()` in `pkg/aws/aws.go`.
 
 The `buildConfigOptions` function correctly sets up a `StaticCredentialsProvider` when `AccessKeyID` and `SecretAccessKey` are provided. However, `LoadDefaultConfig` still attempts to resolve the `[default]` shared config profile from `~/.aws/config`. On Fargate (and other container-only environments), this file does not exist, causing the init to fail.
 
