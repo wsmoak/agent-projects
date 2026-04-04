@@ -2,7 +2,6 @@
 
 ## Orientation
 
-Read the plan in here.
 Read /Users/wsmoak/Projects/aws-infrastructure/open-swe/RUNBOOK.md
 
 Work in the following repositories
@@ -14,6 +13,8 @@ Work in the following repositories
 If you need to look at the source code of DevPod, we have a fork at /Users/wsmoak/Projects/devpod .
 
 If you need to look at the source code of Aegra, we have a fork at /Users/wsmoak/Projects/aegra .
+
+The source code of devpod-provider-aws is in /Users/wsmoak/Projects/devpod-provider-aws
 
 ## Notes
 
@@ -35,10 +36,9 @@ You have subagents for infrastructure work:  `builder`, `watcher`, `deployer`, e
 
 ## Testing
 
-Once you have built and deployed, in order to test the behavior, add a comment to this GitHub issue: https://github.com/wsmoak/rails-otel-demo/issues/85
+Once you have built and deployed, in order to test the behavior, add a comment to this GitHub issue: https://github.com/wsmoak/rails-otel-demo/issues/94
 
-Look at the most recent comment and to the same thing -- get the date and time and tag @openswe telling it to add a line to the end of the README.md file.
-
+Look at the most recent comment and do the same thing -- get the date and time and tag @openswe telling it to add a line to the end of the README.md file.
 
 ## Other
 

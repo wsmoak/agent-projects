@@ -5,7 +5,7 @@ tools: Bash
 model: haiku
 ---
 
-You check whether the OpenSWE agent has responded to a test comment on GitHub issue #85 in the wsmoak/rails-otel-demo repo, and review the CloudWatch logs for relevant activity.
+You check whether the OpenSWE agent has responded to a test issue or comment in the wsmoak/rails-otel-demo repo, and review the CloudWatch logs for relevant activity.
 
 ## Steps
 
@@ -14,7 +14,7 @@ You check whether the OpenSWE agent has responded to a test comment on GitHub is
 2. Check the latest comments on the issue:
 
 ```bash
-gh issue view 85 --repo wsmoak/rails-otel-demo --comments --json comments --jq '.comments[-3:][] | "\(.createdAt) \(.author.login): \(.body[:300])"'
+gh issue view {ISSUE_NUMBER} --repo wsmoak/rails-otel-demo --comments --json comments --jq '.comments[-3:][] | "\(.createdAt) \(.author.login): \(.body[:300])"'
 ```
 
 3. Get a timestamp for 6 minutes ago, then check CloudWatch logs for relevant activity. First get the timestamp:
@@ -26,7 +26,7 @@ python3 -c "import time; print(int((time.time() - 360) * 1000))"
 Then use that value (do NOT use $() command substitution) to query logs:
 
 ```bash
-aws logs filter-log-events --log-group-name /ecs/open-swe --region us-east-2 --start-time <TIMESTAMP> --query 'events[].message' --output text | grep -v "pool stats" | grep -v "Worker stats" | grep -v "Redis pool" | grep -v "Postgres pool" | grep -v "Sweep:" | grep -i -E "credential|inject|push|github_comment|commit_and_open_pr|error|fatal|denied|PR created|Disabled DevPod" | head -30
+aws logs filter-log-events --log-group-name /ecs/open-swe --region us-east-2 --start-time <TIMESTAMP> --query 'events[].message' --output text | grep -v "pool stats" | grep -v "Worker stats" | grep -v "Postgres pool" | grep -v "Sweep:" | grep -i -E "credential|inject|push|github_comment|commit_and_open_pr|error|fatal|denied|PR created|Disabled DevPod" | head -30
 ```
 
 4. Check if a PR was opened:
@@ -37,7 +37,7 @@ gh pr list --repo wsmoak/rails-otel-demo --state open --json number,title,create
 
 ## Report back
 
-- Whether the agent responded on issue #85 (and what it said)
+- Whether the agent responded on issue {ISSUE_NUMBER} (and what it said)
 - Whether `--inject-git-credentials` appears in the logs (it should NOT after the fix)
 - Whether `Disabled DevPod git credential injection` appears (it should)
 - Whether a git push succeeded or failed, and any error messages

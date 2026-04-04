@@ -9,11 +9,13 @@ You monitor the OpenSWE ECS deployment until it stabilizes.
 
 DO NOT try to read AWS secrets.
 
-Poll the service status every 30 seconds, up to 10 attempts (5 minutes total):
+Poll the service status up to 10 attempts (5 minutes total). IMPORTANT: You MUST sleep 30 seconds between each check. Use a single bash command that combines sleep and the status check:
 
 ```bash
-aws ecs describe-services --cluster open-swe --services open-swe --region us-east-2 --output text --query 'services[0].[serviceName,status,desiredCount,runningCount,deployments[*].[status,desiredCount,runningCount,rolloutState]]'
+sleep 30 && aws ecs describe-services --cluster open-swe --services open-swe --region us-east-2 --output text --query 'services[0].[serviceName,status,desiredCount,runningCount,deployments[*].[status,desiredCount,runningCount,rolloutState]]'
 ```
+
+For the first check only, you may skip the sleep.
 
 Watch for:
 - `rolloutState` changing to `COMPLETED` — the deployment succeeded
@@ -36,4 +38,4 @@ Report back:
 - DEPLOYED, FAILED, or TIMED OUT
 - The final running/desired counts
 - If failed: the stopped task reason or container exit codes
-- If deployed: confirm the health check URL https://openswe.wendysmoak.com/ok
+- If deployed: confirm the health check URL https://openswe.wendysmoak.com/health
