@@ -38,9 +38,9 @@ You have subagents for infrastructure work:  `builder`, `watcher`, `deployer`, e
 
 ## Testing
 
-Once you have built and deployed, in order to test the behavior, add a comment to this GitHub issue: https://github.com/wsmoak/rails-otel-demo/issues/94
+Once you have built and deployed, in order to test the behavior, create a new GitHub issue in https://github.com/wsmoak/rails-otel-demo and tag @openswe and tell it to do something simple like add the current timestamp to the end of the README file.
 
-Look at the most recent comment and do the same thing -- get the date and time and tag @openswe telling it to add a line to the end of the README.md file.
+Look at a recent issue for an example.  Use bash to get the date in a separate command do not use && compound commands.
 
 ## Other
 
