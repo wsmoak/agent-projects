@@ -16,7 +16,10 @@ If you need to look at the source code of Aegra, we have a fork at /Users/wsmoak
 
 The source code of devpod-provider-aws is in /Users/wsmoak/Projects/devpod-provider-aws
 
-The project we use for testing is /Users/wsmoak/Projects/rails-otel-demo
+### Multi-Repo
+1. The first project we used for testing is /Users/wsmoak/Projects/rails-otel-demo
+2. Now we are adding /Users/wsmoak/Projects/django-polls-playwright-demo also with a devcontainer
+3. AND we will have a multi-dev-container setup in /Users/wsmoakProjects/multi-repo-dev-containers
 
 ## Notes
 
