@@ -1,7 +1,7 @@
 # Investigation: Prebuild Repo Gets Removed and Re-cloned
 
 **Date**: 2026-04-05
-**Status**: In progress
+**Status**: Resolved
 
 ## Problem
 
@@ -48,3 +48,30 @@ Add diagnostic logging before the `is_valid_git_repo` check to capture:
 - `test -e /workspaces/rails-otel-demo/.git && file /workspaces/rails-otel-demo/.git`
 
 This will tell us exactly what DevPod set up before the agent code tries to validate it.
+
+## Diagnostic Results
+
+Diagnostics confirmed **H4**: the repo was at `/workspaces/openswe-6a54794e-...` (the workspace name), not `/workspaces/rails-otel-demo`.
+
+```
+Diagnostic ls /workspaces: 
+drwxr-x--- 17 vscode vscode 4096 Apr  5 12:41 openswe-6a54794e-ce9a-4950-a883-c9323aa838fd
+
+Diagnostic ls /workspaces/rails-otel-demo: No such file or directory
+```
+
+## Fix
+
+Changed `_generate_workspace_name()` in `agent/integrations/devpod.py` to use the repo name as the workspace name in git-source mode. This makes DevPod create the directory at `/workspaces/{repo_name}`, matching what the agent expects.
+
+Commit: `8d276dbe` in open-swe-aws-devpod-aegra.
+
+## Verified
+
+Issue #115 confirmed the fix. Logs show the prebuilt repo is found and pulled instead of re-cloned:
+
+```
+Repo exists at /workspaces/rails-otel-demo, checking for uncommitted changes
+Repo is clean, pulling latest changes from wsmoak/rails-otel-demo
+Repo updated at /workspaces/rails-otel-demo
+```
