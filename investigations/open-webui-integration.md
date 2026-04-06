@@ -1,7 +1,7 @@
 # Investigation: Open WebUI Integration
 
 **Date:** 2026-04-06
-**Status:** Research complete, not yet implemented
+**Status:** Implemented and tested locally. See runbook: `runbooks/local-openswe-setup.md`
 
 ## Summary
 
@@ -90,7 +90,10 @@ The pipe would:
 4. Stream the agent's response back to the Open WebUI chat
 
 Reference implementations:
-- https://github.com/open-webui/open-webui/discussions/13945
+- https://github.com/open-webui/pipelines/tree/main/examples/pipelines/integrations/langgraph_pipeline (official Open WebUI pipelines repo example)
+- https://github.com/sieveLau/openwebui-langgraph (standalone example: LangGraph ReAct agent served via Open WebUI pipeline)
+- https://github.com/open-webui/open-webui/discussions/13945 (remote LangGraph with state persistence)
+- https://github.com/open-webui/open-webui/discussions/17337 (pipe for LangGraph with human-in-the-loop)
 - https://pessini.medium.com/from-open-webui-to-langgraph-building-a-human-in-the-loop-pipe-for-real-time-ai-control-26561cca9f9c
 - https://medium.com/@davit_martirosyan/integrating-langgraph-agents-into-open-webui-3533cc3a47e1
 
