@@ -1,7 +1,7 @@
 # Investigation: Running OpenSWE Locally with Docker Sandboxes
 
 **Date:** 2026-04-06
-**Status:** Research complete, not yet implemented
+**Status:** Implemented and tested locally. See runbook: `runbooks/local-openswe-setup.md`
 
 ## Goal
 
@@ -266,6 +266,7 @@ client side).
 
 2. **Prebuild images** -- currently stored in ECR. Locally, you'd either
    skip prebuilds (slower sandbox startup) or push to a local registry.
+   Tested without prebuilds; sandbox startup is slower but works.
 
 3. **Resource limits** -- multiple Docker sandboxes on one machine can
    exhaust RAM and CPU. May need to set Docker resource limits per container.
@@ -274,8 +275,25 @@ client side).
    GitHub (for git clone/push). Docker's default bridge networking handles
    this, but corporate firewalls or VPNs might interfere.
 
-5. **Aegra database migrations** -- need to run `aegra` migrations against
-   the local Postgres before first use. Haven't verified the exact command.
+5. **Aegra database migrations** -- `aegra dev` runs migrations automatically
+   on startup. No separate command needed.
+
+## Issues Found During Implementation
+
+1. **Postgres credentials mismatch**: `aegra dev` generates a docker-compose
+   with user `open_swe_aws_devpod_aegra` but Aegra defaults to `postgres/postgres`.
+   Must export `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` to match.
+
+2. **Port conflict**: If another Postgres container holds port 5432, aegra's
+   compose-managed container starts but the port isn't published. Must ensure
+   5432 is free before running `aegra dev`.
+
+3. **get_config() NameError**: The merge from upstream main (76e45606)
+   reintroduced a bug at server.py:459. Fixed in commit 4594213f.
+
+4. **No GITHUB_TOKEN fallback**: `_resolve_bot_installation_token` only tried
+   the GitHub App, with no fallback to `GITHUB_TOKEN` env var for local dev.
+   Fixed in commit 4594213f.
 
 ## Next Steps
 
