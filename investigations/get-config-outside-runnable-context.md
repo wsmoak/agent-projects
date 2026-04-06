@@ -25,7 +25,12 @@ at `agent/server.py` line 308 (and line 401).
 
 Replaced both `get_config().get("metadata", {})` with `config.get("metadata", {})`, using the `config` parameter already passed into `get_agent()`. Removed the unused `from langgraph.config import get_config` import.
 
+**Status:** Fixed and deployed 2026-04-06 (commit da76c8e9).
+
+Also fixed a related stale `SANDBOX_CREATING` sentinel bug discovered during testing: after a container restart, the in-memory `SANDBOX_BACKENDS` dict is lost but thread metadata still has `sandbox_id='__creating__'`. The old code waited (and timed out) for a sandbox creation that would never complete. Fix: if `SANDBOX_CREATING` but no in-memory backend, reset to `None` and create a fresh sandbox.
+
 ## Notes
 
 - The traceback was visible because Aegra 0.9.2 fixed the structlog missing tracebacks issue (aegra#295)
-- This only manifests on follow-up messages to existing threads (cached sandbox path)
+- Both bugs only manifest on follow-up messages to existing threads (cached sandbox path)
+- The stale sentinel fix is safe for multi-instance scaling because Redis broker routes same thread to same worker
