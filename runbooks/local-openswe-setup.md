@@ -89,53 +89,41 @@ docker run -d --name open-webui \
 
 First startup is slow -- it downloads embedding models from Hugging Face. Wait until `http://localhost:8080` loads. Use a different port if 8080 is taken.
 
-## 6. Start Pipelines Server
+## 6. Install the Pipe Function
 
-```bash
-docker run -d --name pipelines \
-  -p 9099:9099 \
-  -v pipelines-data:/app/pipelines \
-  ghcr.io/open-webui/pipelines:main
-```
-
-## 7. Install the Pipe Function
-
-```bash
-docker cp /Users/wsmoak/Projects/open-swe-aws-devpod-project/scripts/openwebui_aegra_pipe.py \
-  pipelines:/app/pipelines/openwebui_aegra_pipe.py
-docker restart pipelines
-```
-
-Verify it loaded:
-```bash
-docker logs pipelines 2>&1 | grep "Loaded module"
-# INFO:root:Loaded module: openwebui_aegra_pipe
-```
-
-## 8. Connect Open WebUI to Pipelines
+The connection between Open WebUI and Aegra is handled by a Pipe Function that runs inside Open WebUI itself. The source is at `scripts/openwebui_aegra_function.py`.
 
 1. Open `http://localhost:8080`
 2. Create an admin account (first user becomes admin)
-3. Go to **Admin Panel -> Settings -> Connections**
-4. Add an **OpenAI API** connection:
-   - URL: `http://host.docker.internal:9099`
-   - API Key: `0p3n-w3bu!` (default pipelines key)
-5. Save and verify the connection
+3. Go to **Admin Panel -> Functions** (`/admin/functions`)
+4. Click **+** to create a new function
+5. Paste the contents of `scripts/openwebui_aegra_function.py`
+6. Save and enable the function
 
-## 9. Disable Suggested Replies
+The function uses async streaming via `httpx` to forward requests to Aegra and stream responses back to the UI.
+
+### Valve Configuration
+
+After saving the function, click the gear icon to configure valves:
+
+- `AEGRA_URL`: defaults to `http://host.docker.internal:2026` (correct for Open WebUI running in Docker)
+- `DEFAULT_REPO_OWNER`: GitHub repo owner (default: `wsmoak`)
+- `DEFAULT_REPO_NAME`: target repo (default: `multi-repo-dev-containers`)
+
+> **Note:** We originally used Open WebUI Pipelines (a separate Docker container on port 9099) with a `Pipeline` class. This worked but was unnecessary -- a Pipe Function does the same thing without an extra container. The Pipeline version is preserved at `scripts/openwebui_aegra_pipe.py` for reference. The key differences: Pipelines use `class Pipeline` with `pipe(self, user_message, model_id, messages, body)`, while Functions use `class Pipe` with `async pipe(self, body)`.
+
+## 7. Disable Suggested Replies
 
 Open WebUI generates follow-up question suggestions after each response by making an extra LLM call. This wastes tokens. Disable it:
 
 1. Go to **Admin Panel -> Settings -> Interface**
 2. Turn off **Suggested Replies**
 
-## 10. Use It
+## 8. Use It
 
 1. Start a new chat in Open WebUI
-2. Select **Open SWE** from the model dropdown
+2. Select **Open SWE Function** from the model dropdown
 3. Send a message -- the agent will create a Docker sandbox and work in it
-
-The pipe function defaults to `wsmoak/rails-otel-demo`. To change the target repo, go to **Admin Panel -> Settings -> Pipelines** and edit the valve values for `DEFAULT_REPO_OWNER` and `DEFAULT_REPO_NAME`.
 
 ## Troubleshooting
 
@@ -152,24 +140,21 @@ The pipe function defaults to `wsmoak/rails-otel-demo`. To change the target rep
 - This was fixed in commit `4594213f` -- `get_config()` replaced with `config.get()` in `server.py:459`
 - If you merge from upstream main, check that this line hasn't reverted
 
-### "Pipelines Not Detected" in Open WebUI
-- Verify pipelines is running: `curl -s http://localhost:9099/` should return `{"status":true}`
-- Verify Open WebUI can reach it: `docker exec open-webui curl -s http://host.docker.internal:9099/`
-- The URL in Connections must be `http://host.docker.internal:9099` (not localhost, since Open WebUI runs in Docker)
+### Function shows "No response received from Aegra"
+- Verify aegra is running: `curl -s http://localhost:2026/health`
+- Check aegra logs for errors
+- Verify Open WebUI can reach aegra: `docker exec open-webui curl -s http://host.docker.internal:2026/health`
 
-### Pipeline shows "No Pipeline class found"
-- The class must be named `Pipeline`, not `Pipe`
-- The `pipe()` method signature must be: `pipe(self, user_message, model_id, messages, body)`
-
-### TransferEncodingError in Open WebUI
-- Usually means the pipe function crashed mid-stream
-- Check `docker logs pipelines` for the actual Python traceback
+### TransferEncodingError or blank responses
+- Usually means the pipe function crashed mid-stream or blocked the event loop
+- Check Open WebUI container logs: `docker logs open-webui`
+- Make sure the function uses the async version (`async def pipe`) -- the sync version blocks the event loop
 
 ## Cleanup
 
 Stop everything:
 ```bash
-docker stop open-webui pipelines && docker rm open-webui pipelines
+docker stop open-webui && docker rm open-webui
 docker compose -f /path/to/open-swe-aws-devpod-aegra/docker-compose.yml down
 # Stop aegra dev with Ctrl+C
 ```
