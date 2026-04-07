@@ -58,6 +58,8 @@ This will:
 - Run database migrations
 - Start the Aegra server on port 2026 with `--reload`
 
+**Important:** Use `aegra dev`, not `aegra up`. `aegra dev` runs the server on the host where it can see your shell env vars. `aegra up` runs it in a Docker container that cannot see them unless the auto-generated `docker-compose.yml` is manually edited. See `investigations/aegra-up-vs-aegra-dev-env-vars.md` for details.
+
 **Important:** Do NOT have another Postgres container on port 5432 when you run this. If port 5432 is taken, the Postgres container will start but the port won't be published to the host, and aegra will fail to connect.
 
 Verify:
@@ -120,7 +122,14 @@ docker logs pipelines 2>&1 | grep "Loaded module"
    - API Key: `0p3n-w3bu!` (default pipelines key)
 5. Save and verify the connection
 
-## 9. Use It
+## 9. Disable Suggested Replies
+
+Open WebUI generates follow-up question suggestions after each response by making an extra LLM call. This wastes tokens. Disable it:
+
+1. Go to **Admin Panel -> Settings -> Interface**
+2. Turn off **Suggested Replies**
+
+## 10. Use It
 
 1. Start a new chat in Open WebUI
 2. Select **Open SWE** from the model dropdown
