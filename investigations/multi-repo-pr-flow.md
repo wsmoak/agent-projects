@@ -63,3 +63,8 @@ Likely nothing in the agent code. The flow should work because:
 - commit_and_open_pr targets the django repo
 
 The main risk is whether `_clone_or_pull_repo_in_sandbox()` handles the already-cloned repo gracefully. If it tries to clone into an existing directory, it could fail or overwrite the postCreateCommand setup.
+
+## Related
+
+Related feature request for Claude Code to support multiple repos in remote sessions
+https://github.com/anthropics/claude-code/issues/23627

@@ -7,6 +7,15 @@
 
 Asked in https://forum.langchain.com/t/basesandbox-write-fails-if-file-already-exists-any-way-to-overwrite/3335
 
+Forum reply confirmed three valid approaches:
+1. `printf` via `execute()` (our current approach)
+2. `rm -f` then `write()` -- cleanest if you control agent setup
+3. Adding `overwrite: bool = False` parameter to `write()` -- needs upstream change
+
+The responder agreed an `overwrite` parameter should be added, noting the mismatch between the `write()` docstring ("Create a new file, failing if it already exists") and the system prompt shown to the agent ("Create or overwrite files").
+
+PR opened: https://github.com/langchain-ai/deepagents/pull/2493
+
 ## Background
 
 During the merge of upstream `open-swe` main into our DevPod/Aegra branch, a conflict arose in `agent/utils/github.py` around the `setup_git_credentials` function. Upstream main had changed the implementation to use `sandbox_backend.write()`, while our branch uses `sandbox_backend.execute()` with `printf`. The upstream test in `tests/test_github_security.py` was written against the `write()` API and failed against our code.
@@ -60,4 +69,4 @@ The upstream test `test_git_pull_branch_quotes_repo_dir_and_branch_when_using_cr
 
 ## Future consideration
 
-If `deepagents` adds an `overwrite()` or `write(overwrite=True)` method to `BaseSandbox`, we should switch to it. That would give us the cleaner API without the existence-check failure mode. Until then, `printf` via `execute()` is the correct approach for our use case.
+If `deepagents` adds an `overwrite()` or `write(overwrite=True)` method to `BaseSandbox`, we should switch to it. That would give us the cleaner API without the existence-check failure mode. PR https://github.com/langchain-ai/deepagents/pull/2493 has been opened for this. Until then, `printf` via `execute()` is the correct approach for our use case.
