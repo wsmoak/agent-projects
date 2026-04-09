@@ -1,10 +1,10 @@
-[ ] Add the current date and time to the bottom of the README.md file in both
+[x] Add the current date and time to the bottom of the README.md file in both
 rails-otel-demo 
 
-[ ] django-polls-playwright-demo projects.
+[x] django-polls-playwright-demo projects.
 
-[ ] Open a pull request in rails-otel-demo
+[x] Open a pull request in rails-otel-demo https://github.com/wsmoak/rails-otel-demo/pull/137
 
-[ ] Open a pull request in django-polls-playwright-demo 
+[x] Open a pull request in django-polls-playwright-demo https://github.com/wsmoak/django-polls-playwright-demo/pull/17 
 
-[ ] Also Update this plan file on the test-project branch to check off the items and open a PR
+[x] Also Update this plan file on the test-project branch to check off the items and open a PR
