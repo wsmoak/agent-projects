@@ -7,4 +7,4 @@ rails-otel-demo
 
 [ ] Open a pull request in django-polls-playwright-demo 
 
-[ ] Also Update this plan file on the test-project branch to check off the items and open a PR
+[ ] Also Update this plan file and open a pull request targeting the test-project branch 
