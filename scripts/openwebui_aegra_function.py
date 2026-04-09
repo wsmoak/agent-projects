@@ -1,7 +1,7 @@
 """
 title: Open SWE
 author: wsmoak
-version: 0.8.0
+version: 0.9.0
 description: Pipe function that connects Open WebUI to a local Aegra/OpenSWE server.
 """
 
@@ -57,7 +57,7 @@ class Pipe:
     async def pipe(self, body: dict) -> AsyncGenerator[str, None]:
         messages = body.get("messages", [])
         user_message = messages[-1]["content"] if messages else ""
-        chat_id = body.get("chat_id", "default")
+        chat_id = body.get("metadata", {}).get("chat_id") or body.get("chat_id", "default")
 
         try:
             thread_id = await self._get_or_create_thread(chat_id)
